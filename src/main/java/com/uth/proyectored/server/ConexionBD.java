@@ -8,9 +8,9 @@ import java.util.List;
 
 public class ConexionBD {
 
-private static final String URL = "jdbc:mysql://akura.proxy.rlwy.net:16294/railway?useSSL=false&serverTimezone=UTC";
+private static final String URL = "jdbc:mysql://mysql.railway.internal:3306/railway?useSSL=false&serverTimezone=UTC";
 private static final String USUARIO = "root";
-private static final String CLAVE = "xhTRihGABeAqiXczabjPAzslrQdjLWDn";
+private static final String CLAVE = "yfXRggNfdhZOoutyHtUbriOwClqNXnOk";
 
     private static Connection obtenerConexion() throws SQLException {
         return DriverManager.getConnection(URL, USUARIO, CLAVE);
