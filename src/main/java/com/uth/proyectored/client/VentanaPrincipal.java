@@ -4,7 +4,11 @@ import com.uth.proyectored.product.Producto;
 import com.uth.proyectored.protocol.Mensaje;
 
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -12,61 +16,220 @@ import java.util.List;
 
 public class VentanaPrincipal extends JFrame {
 
+    // Paleta simple, consistente en toda la ventana
+    private static final Color COLOR_PRIMARIO = new Color(0x2F6FED);
+    private static final Color COLOR_VERDE = new Color(0x1E9E5A);
+    private static final Color COLOR_ROJO = new Color(0xD64545);
+    private static final Color COLOR_GRIS_TEXTO = new Color(0x555555);
+    private static final Font FUENTE_BASE = new Font("Segoe UI", Font.PLAIN, 13);
+    private static final Font FUENTE_TITULO = new Font("Segoe UI", Font.BOLD, 13);
+
     private final ClienteConexion conexion = new ClienteConexion();
 
     private final JTextField campoHost = new JTextField("127.0.0.1", 14);
     private final JTextField campoPuerto = new JTextField("5000", 5);
     private final JButton botonConectar = new JButton("Conectar");
+    private final JLabel estadoConexion = new JLabel("\u25CF Desconectado");
 
-    private final DefaultTableModel modeloTabla =
-            new DefaultTableModel(new Object[]{"ID", "Nombre", "Precio", "Stock"}, 0);
+    private final JTextField campoBusqueda = new JTextField();
+
+    private final DefaultTableModel modeloTabla = new DefaultTableModel(
+            new Object[]{"ID", "Nombre", "Precio", "Stock"}, 0) {
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return false;
+        }
+    };
     private final JTable tablaProductos = new JTable(modeloTabla);
+    private final TableRowSorterCompat filtro = new TableRowSorterCompat(modeloTabla);
 
-    private final JButton botonListar = new JButton("Listar productos");
-    private final JButton botonAgregar = new JButton("Agregar producto");
-    private final JButton botonReporte = new JButton("Generar reporte PDF");
+    private final JButton botonListar = new JButton("\u21BB Listar");
+    private final JButton botonAgregar = new JButton("+ Agregar");
+    private final JButton botonEditar = new JButton("\u270E Editar");
+    private final JButton botonEliminar = new JButton("\u2716 Eliminar");
+    private final JButton botonReporte = new JButton("\u2B07 Reporte PDF");
+
+    private final JLabel etiquetaContador = new JLabel("0 productos");
 
     public VentanaPrincipal() {
         super("Proyecto en red - Cliente");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(560, 400);
+        setSize(760, 480);
+        setMinimumSize(new Dimension(620, 400));
         setLocationRelativeTo(null);
         construirInterfaz();
         habilitarAccionesRed(false);
+        habilitarAccionesFila(false);
     }
 
     private void construirInterfaz() {
-        JPanel panelConexion = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        panelConexion.add(new JLabel("Host/IP del servidor:"));
-        panelConexion.add(campoHost);
-        panelConexion.add(new JLabel("Puerto:"));
-        panelConexion.add(campoPuerto);
-        panelConexion.add(botonConectar);
+        getContentPane().setLayout(new BorderLayout(0, 0));
+        getContentPane().setBackground(Color.WHITE);
 
-        JPanel panelAcciones = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        panelAcciones.add(botonListar);
-        panelAcciones.add(botonAgregar);
-        panelAcciones.add(botonReporte);
-
-        setLayout(new BorderLayout());
-        add(panelConexion, BorderLayout.NORTH);
-        add(new JScrollPane(tablaProductos), BorderLayout.CENTER);
-        add(panelAcciones, BorderLayout.SOUTH);
+        add(construirPanelConexion(), BorderLayout.NORTH);
+        add(construirPanelCentral(), BorderLayout.CENTER);
+        add(construirPanelAcciones(), BorderLayout.SOUTH);
 
         botonConectar.addActionListener(e -> conectar());
         botonListar.addActionListener(e -> listarProductos());
         botonAgregar.addActionListener(e -> agregarProducto());
+        botonEditar.addActionListener(e -> editarProducto());
+        botonEliminar.addActionListener(e -> eliminarProducto());
         botonReporte.addActionListener(e -> generarReporte());
+
+        tablaProductos.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                habilitarAccionesFila(tablaProductos.getSelectedRow() != -1);
+            }
+        });
+
+        campoBusqueda.getDocument().addDocumentListener(new DocumentListener() {
+            public void insertUpdate(DocumentEvent e) { filtro.aplicar(campoBusqueda.getText()); }
+            public void removeUpdate(DocumentEvent e) { filtro.aplicar(campoBusqueda.getText()); }
+            public void changedUpdate(DocumentEvent e) { filtro.aplicar(campoBusqueda.getText()); }
+        });
+    }
+
+    private JPanel construirPanelConexion() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(new EmptyBorder(12, 16, 12, 16));
+        panel.setBackground(new Color(0xF7F8FA));
+
+        JPanel izquierda = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        izquierda.setOpaque(false);
+        JLabel etiquetaHost = new JLabel("Servidor:");
+        etiquetaHost.setFont(FUENTE_TITULO);
+        izquierda.add(etiquetaHost);
+        izquierda.add(campoHost);
+        JLabel etiquetaPuerto = new JLabel("Puerto:");
+        etiquetaPuerto.setFont(FUENTE_TITULO);
+        izquierda.add(etiquetaPuerto);
+        izquierda.add(campoPuerto);
+        estilizarBotonPrimario(botonConectar);
+        izquierda.add(botonConectar);
+
+        estadoConexion.setFont(FUENTE_TITULO);
+        estadoConexion.setForeground(COLOR_ROJO);
+
+        panel.add(izquierda, BorderLayout.WEST);
+        panel.add(estadoConexion, BorderLayout.EAST);
+        return panel;
+    }
+
+    private JPanel construirPanelCentral() {
+        JPanel panel = new JPanel(new BorderLayout(0, 8));
+        panel.setBorder(new EmptyBorder(12, 16, 0, 16));
+
+        JPanel panelBusqueda = new JPanel(new BorderLayout(8, 0));
+        JLabel lupa = new JLabel("Buscar:");
+        lupa.setFont(FUENTE_BASE);
+        campoBusqueda.setFont(FUENTE_BASE);
+        campoBusqueda.putClientProperty("JTextField.placeholderText", "Filtrar por nombre...");
+        panelBusqueda.add(lupa, BorderLayout.WEST);
+        panelBusqueda.add(campoBusqueda, BorderLayout.CENTER);
+
+        estilizarTabla();
+        JScrollPane scroll = new JScrollPane(tablaProductos);
+        scroll.setBorder(BorderFactory.createLineBorder(new Color(0xE0E0E0)));
+
+        etiquetaContador.setFont(FUENTE_BASE);
+        etiquetaContador.setForeground(COLOR_GRIS_TEXTO);
+
+        panel.add(panelBusqueda, BorderLayout.NORTH);
+        panel.add(scroll, BorderLayout.CENTER);
+        panel.add(etiquetaContador, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private void estilizarTabla() {
+        tablaProductos.setFont(FUENTE_BASE);
+        tablaProductos.setRowHeight(26);
+        tablaProductos.setSelectionBackground(new Color(0xDCE8FF));
+        tablaProductos.setSelectionForeground(Color.BLACK);
+        tablaProductos.setGridColor(new Color(0xEDEDED));
+        tablaProductos.setShowGrid(true);
+        tablaProductos.setRowSorter(filtro.getSorter());
+
+        JTableHeader header = tablaProductos.getTableHeader();
+        header.setFont(FUENTE_TITULO);
+        header.setBackground(new Color(0xF0F2F5));
+        header.setPreferredSize(new Dimension(header.getWidth(), 30));
+
+        tablaProductos.getColumnModel().getColumn(0).setPreferredWidth(50);
+        tablaProductos.getColumnModel().getColumn(1).setPreferredWidth(260);
+        tablaProductos.getColumnModel().getColumn(2).setPreferredWidth(100);
+        tablaProductos.getColumnModel().getColumn(3).setPreferredWidth(80);
+    }
+
+    private JPanel construirPanelAcciones() {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 10));
+        panel.setBorder(new EmptyBorder(4, 12, 4, 12));
+        panel.setBackground(new Color(0xF7F8FA));
+
+        estilizarBotonSecundario(botonListar);
+        estilizarBotonPrimario(botonAgregar);
+        estilizarBotonSecundario(botonEditar);
+        estilizarBotonPeligro(botonEliminar);
+        estilizarBotonSecundario(botonReporte);
+
+        panel.add(botonListar);
+        panel.add(botonAgregar);
+        panel.add(botonEditar);
+        panel.add(botonEliminar);
+        panel.add(botonReporte);
+        return panel;
+    }
+
+    private void estilizarBotonPrimario(JButton boton) {
+        boton.setFont(FUENTE_TITULO);
+        boton.setBackground(COLOR_PRIMARIO);
+        boton.setForeground(Color.WHITE);
+        boton.setFocusPainted(false);
+        boton.setBorder(new EmptyBorder(6, 14, 6, 14));
+    }
+
+    private void estilizarBotonSecundario(JButton boton) {
+        boton.setFont(FUENTE_BASE);
+        boton.setFocusPainted(false);
+        boton.setBorder(new EmptyBorder(6, 12, 6, 12));
+    }
+
+    private void estilizarBotonPeligro(JButton boton) {
+        boton.setFont(FUENTE_BASE);
+        boton.setForeground(COLOR_ROJO);
+        boton.setFocusPainted(false);
+        boton.setBorder(new EmptyBorder(6, 12, 6, 12));
     }
 
     private void habilitarAccionesRed(boolean habilitado) {
         botonListar.setEnabled(habilitado);
         botonAgregar.setEnabled(habilitado);
         botonReporte.setEnabled(habilitado);
+        if (!habilitado) habilitarAccionesFila(false);
+    }
+
+    private void habilitarAccionesFila(boolean habilitado) {
+        botonEditar.setEnabled(habilitado);
+        botonEliminar.setEnabled(habilitado);
+    }
+
+    private void actualizarEstadoConexion(boolean conectado) {
+        if (conectado) {
+            estadoConexion.setText("\u25CF Conectado");
+            estadoConexion.setForeground(COLOR_VERDE);
+        } else {
+            estadoConexion.setText("\u25CF Desconectado");
+            estadoConexion.setForeground(COLOR_ROJO);
+        }
     }
 
     private void conectar() {
         String host = campoHost.getText().trim();
+        if (host.isEmpty()) {
+            mostrarError("Escribe el host o IP del servidor");
+            return;
+        }
+
         int puerto;
         try {
             puerto = Integer.parseInt(campoPuerto.getText().trim());
@@ -78,8 +241,10 @@ public class VentanaPrincipal extends JFrame {
         try {
             conexion.conectar(host, puerto);
             habilitarAccionesRed(true);
-            JOptionPane.showMessageDialog(this, "Conectado a " + host + ":" + puerto);
+            actualizarEstadoConexion(true);
+            listarProductos();
         } catch (Exception ex) {
+            actualizarEstadoConexion(false);
             mostrarError("No se pudo conectar: " + ex.getMessage());
         }
     }
@@ -96,44 +261,160 @@ public class VentanaPrincipal extends JFrame {
                 for (Producto p : productos) {
                     modeloTabla.addRow(new Object[]{p.getId(), p.getNombre(), p.getPrecio(), p.getStock()});
                 }
+                etiquetaContador.setText(productos.size() + " producto" + (productos.size() == 1 ? "" : "s"));
+                habilitarAccionesFila(false);
             } else {
                 mostrarError(respuesta.getTexto());
             }
         } catch (Exception ex) {
+            actualizarEstadoConexion(false);
+            habilitarAccionesRed(false);
             mostrarError("Error al listar productos: " + ex.getMessage());
         }
     }
 
     private void agregarProducto() {
-        JTextField nombre = new JTextField();
-        JTextField precio = new JTextField();
-        JTextField stock = new JTextField();
-
-        Object[] campos = {"Nombre:", nombre, "Precio:", precio, "Stock:", stock};
-
-        int opcion = JOptionPane.showConfirmDialog(this, campos, "Nuevo producto", JOptionPane.OK_CANCEL_OPTION);
-        if (opcion != JOptionPane.OK_OPTION) return;
+        Producto nuevo = mostrarDialogoProducto("Nuevo producto", null);
+        if (nuevo == null) return;
 
         try {
-            Producto nuevo = new Producto(
-                    0,
-                    nombre.getText().trim(),
-                    Double.parseDouble(precio.getText().trim()),
-                    Integer.parseInt(stock.getText().trim())
-            );
-
             Mensaje respuesta = conexion.enviarYRecibir(new Mensaje(Mensaje.Tipo.CREAR_PRODUCTO, nuevo));
-
             if (respuesta.getTipo() == Mensaje.Tipo.RESPUESTA_OK) {
                 listarProductos();
             } else {
                 mostrarError(respuesta.getTexto());
             }
-        } catch (NumberFormatException nfe) {
-            mostrarError("Precio y stock deben ser numeros");
         } catch (Exception ex) {
             mostrarError("Error al agregar producto: " + ex.getMessage());
         }
+    }
+
+    private void editarProducto() {
+        int fila = tablaProductos.getSelectedRow();
+        if (fila == -1) return;
+        int filaModelo = tablaProductos.convertRowIndexToModel(fila);
+
+        Producto actual = new Producto(
+                (Integer) modeloTabla.getValueAt(filaModelo, 0),
+                (String) modeloTabla.getValueAt(filaModelo, 1),
+                (Double) modeloTabla.getValueAt(filaModelo, 2),
+                (Integer) modeloTabla.getValueAt(filaModelo, 3)
+        );
+
+        Producto editado = mostrarDialogoProducto("Editar producto", actual);
+        if (editado == null) return;
+        editado.setId(actual.getId());
+
+        try {
+            Mensaje respuesta = conexion.enviarYRecibir(new Mensaje(Mensaje.Tipo.EDITAR_PRODUCTO, editado));
+            if (respuesta.getTipo() == Mensaje.Tipo.RESPUESTA_OK) {
+                listarProductos();
+            } else {
+                mostrarError(respuesta.getTexto());
+            }
+        } catch (Exception ex) {
+            mostrarError("Error al editar producto: " + ex.getMessage());
+        }
+    }
+
+    private void eliminarProducto() {
+        int fila = tablaProductos.getSelectedRow();
+        if (fila == -1) return;
+        int filaModelo = tablaProductos.convertRowIndexToModel(fila);
+
+        int id = (Integer) modeloTabla.getValueAt(filaModelo, 0);
+        String nombre = (String) modeloTabla.getValueAt(filaModelo, 1);
+
+        int confirmacion = JOptionPane.showConfirmDialog(
+                this,
+                "¿Eliminar \"" + nombre + "\"? Esta accion no se puede deshacer.",
+                "Confirmar eliminacion",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+        );
+        if (confirmacion != JOptionPane.YES_OPTION) return;
+
+        try {
+            Mensaje respuesta = conexion.enviarYRecibir(new Mensaje(Mensaje.Tipo.ELIMINAR_PRODUCTO, id));
+            if (respuesta.getTipo() == Mensaje.Tipo.RESPUESTA_OK) {
+                listarProductos();
+            } else {
+                mostrarError(respuesta.getTexto());
+            }
+        } catch (Exception ex) {
+            mostrarError("Error al eliminar producto: " + ex.getMessage());
+        }
+    }
+
+   
+    private Producto mostrarDialogoProducto(String titulo, Producto existente) {
+        JTextField campoNombre = new JTextField(existente != null ? existente.getNombre() : "");
+        JTextField campoPrecio = new JTextField(existente != null ? String.valueOf(existente.getPrecio()) : "");
+        JTextField campoStock = new JTextField(existente != null ? String.valueOf(existente.getStock()) : "");
+
+        JPanel panel = new JPanel(new GridLayout(0, 1, 4, 4));
+        panel.add(etiquetaCampo("Nombre:"));
+        panel.add(campoNombre);
+        panel.add(etiquetaCampo("Precio:"));
+        panel.add(campoPrecio);
+        panel.add(etiquetaCampo("Stock:"));
+        panel.add(campoStock);
+
+        while (true) {
+            int opcion = JOptionPane.showConfirmDialog(this, panel, titulo, JOptionPane.OK_CANCEL_OPTION);
+            if (opcion != JOptionPane.OK_OPTION) return null;
+
+            String nombre = campoNombre.getText().trim();
+            String textoPrecio = campoPrecio.getText().trim();
+            String textoStock = campoStock.getText().trim();
+
+            String errorValidacion = validarCampos(nombre, textoPrecio, textoStock);
+            if (errorValidacion != null) {
+                mostrarError(errorValidacion);
+                continue;
+            }
+
+            double precio = Double.parseDouble(textoPrecio);
+            int stock = Integer.parseInt(textoStock);
+            return new Producto(0, nombre, precio, stock);
+        }
+    }
+
+    private String validarCampos(String nombre, String textoPrecio, String textoStock) {
+        if (nombre.isEmpty()) {
+            return "El nombre no puede estar vacio";
+        }
+        if (nombre.length() > 100) {
+            return "El nombre no puede tener mas de 100 caracteres";
+        }
+
+        double precio;
+        try {
+            precio = Double.parseDouble(textoPrecio);
+        } catch (NumberFormatException ex) {
+            return "El precio debe ser un numero (ej. 199.99)";
+        }
+        if (precio < 0) {
+            return "El precio no puede ser negativo";
+        }
+
+        int stock;
+        try {
+            stock = Integer.parseInt(textoStock);
+        } catch (NumberFormatException ex) {
+            return "El stock debe ser un numero entero (ej. 10)";
+        }
+        if (stock < 0) {
+            return "El stock no puede ser negativo";
+        }
+
+        return null;
+    }
+
+    private JLabel etiquetaCampo(String texto) {
+        JLabel label = new JLabel(texto);
+        label.setFont(FUENTE_TITULO);
+        return label;
     }
 
     private void generarReporte() {
@@ -163,5 +444,26 @@ public class VentanaPrincipal extends JFrame {
 
     private void mostrarError(String texto) {
         JOptionPane.showMessageDialog(this, texto, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+   
+    private static class TableRowSorterCompat {
+        private final javax.swing.table.TableRowSorter<DefaultTableModel> sorter;
+
+        TableRowSorterCompat(DefaultTableModel modelo) {
+            this.sorter = new javax.swing.table.TableRowSorter<>(modelo);
+        }
+
+        javax.swing.table.TableRowSorter<DefaultTableModel> getSorter() {
+            return sorter;
+        }
+
+        void aplicar(String texto) {
+            if (texto == null || texto.isBlank()) {
+                sorter.setRowFilter(null);
+            } else {
+                sorter.setRowFilter(javax.swing.RowFilter.regexFilter("(?i)" + java.util.regex.Pattern.quote(texto), 1));
+            }
+        }
     }
 }
