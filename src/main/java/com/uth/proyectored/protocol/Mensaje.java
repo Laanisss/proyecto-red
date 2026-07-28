@@ -2,6 +2,7 @@ package com.uth.proyectored.protocol;
 
 import java.io.Serializable;
 
+
 public class Mensaje implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -9,6 +10,8 @@ public class Mensaje implements Serializable {
     public enum Tipo {
         LISTAR_PRODUCTOS,
         CREAR_PRODUCTO,
+        EDITAR_PRODUCTO,
+        ELIMINAR_PRODUCTO,
         GENERAR_REPORTE,
         RESPUESTA_OK,
         RESPUESTA_ERROR,
