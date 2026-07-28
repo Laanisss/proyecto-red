@@ -12,6 +12,7 @@ import java.net.SocketException;
 import java.sql.SQLException;
 import java.util.List;
 
+
 public class ManejadorCliente extends Thread {
 
     private final Socket socket;
@@ -62,6 +63,18 @@ public class ManejadorCliente extends Thread {
                     Producto nuevo = (Producto) peticion.getDato();
                     conexionBD.crearProducto(nuevo);
                     return new Mensaje(Mensaje.Tipo.RESPUESTA_OK, null, "Producto agregado");
+                }
+
+                case EDITAR_PRODUCTO -> {
+                    Producto editado = (Producto) peticion.getDato();
+                    conexionBD.actualizarProducto(editado);
+                    return new Mensaje(Mensaje.Tipo.RESPUESTA_OK, null, "Producto actualizado");
+                }
+
+                case ELIMINAR_PRODUCTO -> {
+                    int id = (Integer) peticion.getDato();
+                    conexionBD.eliminarProducto(id);
+                    return new Mensaje(Mensaje.Tipo.RESPUESTA_OK, null, "Producto eliminado");
                 }
 
                 case GENERAR_REPORTE -> {
