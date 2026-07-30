@@ -3,7 +3,6 @@ package com.uth.proyectored.server;
 import com.uth.proyectored.product.Producto;
 import com.uth.proyectored.product.Venta;
 import net.sf.jasperreports.engine.*;
-import net.sf.jasperreports.engine.data.JREmptyDataSource;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
 
 import java.io.ByteArrayOutputStream;
