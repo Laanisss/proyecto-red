@@ -12,11 +12,15 @@ public class Mensaje implements Serializable {
         CREAR_PRODUCTO,
         EDITAR_PRODUCTO,
         ELIMINAR_PRODUCTO,
+        VENDER_PRODUCTO,
+        LISTAR_VENTAS,
         GENERAR_REPORTE,
         RESPUESTA_OK,
         RESPUESTA_ERROR,
         RESPUESTA_DATOS,
-        RESPUESTA_REPORTE
+        RESPUESTA_REPORTE,
+        RESPUESTA_FACTURA,
+        RESPUESTA_VENTAS
     }
 
     private Tipo tipo;
