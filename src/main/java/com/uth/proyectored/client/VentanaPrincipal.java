@@ -1,10 +1,14 @@
 package com.uth.proyectored.client;
 
 import com.uth.proyectored.product.Producto;
+import com.uth.proyectored.product.Venta;
+import com.uth.proyectored.product.SolicitudVenta;
+import com.uth.proyectored.product.FacturaGenerada;
 import com.uth.proyectored.protocol.Mensaje;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
@@ -16,7 +20,7 @@ import java.util.List;
 
 public class VentanaPrincipal extends JFrame {
 
-    // Paleta simple, consistente en toda la ventana
+    
     private static final Color COLOR_PRIMARIO = new Color(0x2F6FED);
     private static final Color COLOR_VERDE = new Color(0x1E9E5A);
     private static final Color COLOR_ROJO = new Color(0xD64545);
@@ -47,7 +51,8 @@ public class VentanaPrincipal extends JFrame {
     private final JButton botonAgregar = new JButton("+ Agregar");
     private final JButton botonEditar = new JButton("\u270E Editar");
     private final JButton botonEliminar = new JButton("\u2716 Eliminar");
-    private final JButton botonReporte = new JButton("\u2B07 Reporte PDF");
+    private final JButton botonVender = new JButton("$ Vender");
+    private final JButton botonHistorial = new JButton("\u2263 Historial ventas");
 
     private final JLabel etiquetaContador = new JLabel("0 productos");
 
@@ -75,7 +80,8 @@ public class VentanaPrincipal extends JFrame {
         botonAgregar.addActionListener(e -> agregarProducto());
         botonEditar.addActionListener(e -> editarProducto());
         botonEliminar.addActionListener(e -> eliminarProducto());
-        botonReporte.addActionListener(e -> generarReporte());
+        botonVender.addActionListener(e -> venderProducto());
+        botonHistorial.addActionListener(e -> verHistorialVentas());
 
         tablaProductos.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -170,13 +176,15 @@ public class VentanaPrincipal extends JFrame {
         estilizarBotonPrimario(botonAgregar);
         estilizarBotonSecundario(botonEditar);
         estilizarBotonPeligro(botonEliminar);
-        estilizarBotonSecundario(botonReporte);
+        estilizarBotonPrimario(botonVender);
+        estilizarBotonSecundario(botonHistorial);
 
         panel.add(botonListar);
         panel.add(botonAgregar);
         panel.add(botonEditar);
         panel.add(botonEliminar);
-        panel.add(botonReporte);
+        panel.add(botonVender);
+        panel.add(botonHistorial);
         return panel;
     }
 
@@ -204,13 +212,14 @@ public class VentanaPrincipal extends JFrame {
     private void habilitarAccionesRed(boolean habilitado) {
         botonListar.setEnabled(habilitado);
         botonAgregar.setEnabled(habilitado);
-        botonReporte.setEnabled(habilitado);
+        botonHistorial.setEnabled(habilitado);
         if (!habilitado) habilitarAccionesFila(false);
     }
 
     private void habilitarAccionesFila(boolean habilitado) {
         botonEditar.setEnabled(habilitado);
         botonEliminar.setEnabled(habilitado);
+        botonVender.setEnabled(habilitado);
     }
 
     private void actualizarEstadoConexion(boolean conectado) {
@@ -346,7 +355,13 @@ public class VentanaPrincipal extends JFrame {
         }
     }
 
-   
+    /**
+     * Dialogo compartido para crear y editar. Si "existente" es null, es un
+     * producto nuevo (campos vacios); si no, precarga los valores actuales.
+     * Valida los campos ANTES de cerrar el dialogo, mostrando el error dentro
+     * del mismo dialogo para que el usuario pueda corregir sin perder lo que
+     * ya escribio.
+     */
     private Producto mostrarDialogoProducto(String titulo, Producto existente) {
         JTextField campoNombre = new JTextField(existente != null ? existente.getNombre() : "");
         JTextField campoPrecio = new JTextField(existente != null ? String.valueOf(existente.getPrecio()) : "");
@@ -417,28 +432,147 @@ public class VentanaPrincipal extends JFrame {
         return label;
     }
 
-    private void generarReporte() {
+    private void venderProducto() {
+        int fila = tablaProductos.getSelectedRow();
+        if (fila == -1) return;
+        int filaModelo = tablaProductos.convertRowIndexToModel(fila);
+
+        int productoId = (Integer) modeloTabla.getValueAt(filaModelo, 0);
+        String nombre = (String) modeloTabla.getValueAt(filaModelo, 1);
+        int stockDisponible = (Integer) modeloTabla.getValueAt(filaModelo, 3);
+
+        String textoCantidad = JOptionPane.showInputDialog(
+                this,
+                "Vender \"" + nombre + "\" (stock disponible: " + stockDisponible + ")\nCantidad a vender:",
+                "1"
+        );
+        if (textoCantidad == null) return;
+        textoCantidad = textoCantidad.trim();
+
+        int cantidad;
         try {
-            Mensaje respuesta = conexion.enviarYRecibir(new Mensaje(Mensaje.Tipo.GENERAR_REPORTE));
+            cantidad = Integer.parseInt(textoCantidad);
+        } catch (NumberFormatException ex) {
+            mostrarError("La cantidad debe ser un numero entero");
+            return;
+        }
+        if (cantidad <= 0) {
+            mostrarError("La cantidad debe ser mayor a cero");
+            return;
+        }
+        if (cantidad > stockDisponible) {
+            mostrarError("No hay suficiente stock. Disponible: " + stockDisponible);
+            return;
+        }
 
-            if (respuesta.getTipo() == Mensaje.Tipo.RESPUESTA_REPORTE) {
-                byte[] pdf = (byte[]) respuesta.getDato();
+        try {
+            Mensaje respuesta = conexion.enviarYRecibir(
+                    new Mensaje(Mensaje.Tipo.VENDER_PRODUCTO, new SolicitudVenta(productoId, cantidad)));
 
-                File archivo = File.createTempFile("reporte_productos_", ".pdf");
-                try (FileOutputStream fos = new FileOutputStream(archivo)) {
-                    fos.write(pdf);
-                }
+            if (respuesta.getTipo() == Mensaje.Tipo.RESPUESTA_FACTURA) {
+                FacturaGenerada factura = (FacturaGenerada) respuesta.getDato();
+                Venta venta = factura.getVenta();
 
-                if (Desktop.isDesktopSupported()) {
-                    Desktop.getDesktop().open(archivo);
-                } else {
-                    JOptionPane.showMessageDialog(this, "PDF guardado en: " + archivo.getAbsolutePath());
-                }
+                listarProductos();
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Venta registrada.\nTotal: L. " + String.format("%.2f", venta.getTotal()),
+                        "Venta exitosa",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+
+                abrirOGuardarPdf(factura.getPdf(), "factura_" + venta.getId() + "_");
             } else {
                 mostrarError(respuesta.getTexto());
             }
         } catch (Exception ex) {
-            mostrarError("Error al generar el reporte: " + ex.getMessage());
+            mostrarError("Error al registrar la venta: " + ex.getMessage());
+        }
+    }
+
+    private void verHistorialVentas() {
+        try {
+            Mensaje respuesta = conexion.enviarYRecibir(new Mensaje(Mensaje.Tipo.LISTAR_VENTAS));
+
+            if (respuesta.getTipo() == Mensaje.Tipo.RESPUESTA_VENTAS) {
+                @SuppressWarnings("unchecked")
+                List<Venta> ventas = (List<Venta>) respuesta.getDato();
+                mostrarDialogoHistorial(ventas);
+            } else {
+                mostrarError(respuesta.getTexto());
+            }
+        } catch (Exception ex) {
+            mostrarError("Error al obtener el historial: " + ex.getMessage());
+        }
+    }
+
+    private void mostrarDialogoHistorial(List<Venta> ventas) {
+        DefaultTableModel modelo = new DefaultTableModel(
+                new Object[]{"ID", "Producto", "Cantidad", "Precio unit.", "Total", "Fecha"}, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        for (Venta v : ventas) {
+            modelo.addRow(new Object[]{
+                    v.getId(), v.getProductoNombre(), v.getCantidad(),
+                    v.getPrecioUnitario(), v.getTotal(), v.getFecha()
+            });
+        }
+
+        JTable tabla = new JTable(modelo);
+        tabla.setFont(FUENTE_BASE);
+        tabla.setRowHeight(24);
+        tabla.getTableHeader().setFont(FUENTE_TITULO);
+
+        JScrollPane scroll = new JScrollPane(tabla);
+        scroll.setPreferredSize(new Dimension(600, 320));
+
+        JLabel resumen = new JLabel(ventas.size() + " venta" + (ventas.size() == 1 ? "" : "s") + " registrada"
+                + (ventas.size() == 1 ? "" : "s"));
+        resumen.setFont(FUENTE_BASE);
+        resumen.setForeground(COLOR_GRIS_TEXTO);
+        resumen.setBorder(new EmptyBorder(6, 4, 0, 0));
+
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.add(scroll, BorderLayout.CENTER);
+        panel.add(resumen, BorderLayout.SOUTH);
+
+        JOptionPane.showMessageDialog(this, panel, "Historial de ventas", JOptionPane.PLAIN_MESSAGE);
+    }
+
+    
+    private void abrirOGuardarPdf(byte[] pdf, String prefijoNombre) {
+        if (pdf == null || pdf.length == 0) {
+            mostrarError("El servidor no devolvio el PDF (llego vacio)");
+            return;
+        }
+
+        File archivo;
+        try {
+            archivo = File.createTempFile(prefijoNombre, ".pdf");
+            try (FileOutputStream fos = new FileOutputStream(archivo)) {
+                fos.write(pdf);
+            }
+        } catch (Exception ex) {
+            mostrarError("No se pudo guardar el PDF: " + ex.getMessage());
+            return;
+        }
+
+        boolean abierto = false;
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+            try {
+                Desktop.getDesktop().open(archivo);
+                abierto = true;
+            } catch (Exception ignorado) {
+                abierto = false;
+            }
+        }
+
+        if (!abierto) {
+            JOptionPane.showMessageDialog(this, "PDF guardado en:\n" + archivo.getAbsolutePath());
         }
     }
 
