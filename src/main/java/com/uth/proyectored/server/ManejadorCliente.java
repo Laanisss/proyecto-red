@@ -1,6 +1,9 @@
 package com.uth.proyectored.server;
 
 import com.uth.proyectored.product.Producto;
+import com.uth.proyectored.product.SolicitudVenta;
+import com.uth.proyectored.product.Venta;
+import com.uth.proyectored.product.FacturaGenerada;
 import com.uth.proyectored.protocol.Mensaje;
 
 import java.io.EOFException;
@@ -77,6 +80,18 @@ public class ManejadorCliente extends Thread {
                     return new Mensaje(Mensaje.Tipo.RESPUESTA_OK, null, "Producto eliminado");
                 }
 
+                case VENDER_PRODUCTO -> {
+                    SolicitudVenta solicitud = (SolicitudVenta) peticion.getDato();
+                    Venta venta = conexionBD.registrarVenta(solicitud.getProductoId(), solicitud.getCantidad());
+                    byte[] pdf = generadorReporte.generarFactura(venta);
+                    return new Mensaje(Mensaje.Tipo.RESPUESTA_FACTURA, new FacturaGenerada(venta, pdf));
+                }
+
+                case LISTAR_VENTAS -> {
+                    List<Venta> ventas = conexionBD.listarVentas();
+                    return new Mensaje(Mensaje.Tipo.RESPUESTA_VENTAS, ventas);
+                }
+
                 case GENERAR_REPORTE -> {
                     List<Producto> productos = conexionBD.listarProductos();
                     byte[] pdf = generadorReporte.generarReporteProductos(productos);
@@ -90,7 +105,12 @@ public class ManejadorCliente extends Thread {
         } catch (SQLException e) {
             return new Mensaje(Mensaje.Tipo.RESPUESTA_ERROR, null, "Error de base de datos: " + e.getMessage());
         } catch (Exception e) {
-            return new Mensaje(Mensaje.Tipo.RESPUESTA_ERROR, null, "Error generando el reporte: " + e.getMessage());
+            e.printStackTrace();
+            return new Mensaje(Mensaje.Tipo.RESPUESTA_ERROR, null, "Error generando el reporte: " + e);
+        } catch (Throwable t) {
+          
+            t.printStackTrace();
+            return new Mensaje(Mensaje.Tipo.RESPUESTA_ERROR, null, "Error inesperado en el servidor: " + t);
         }
     }
 }
