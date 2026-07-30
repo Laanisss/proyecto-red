@@ -1,5 +1,6 @@
 package com.uth.proyectored.client;
 
+
 import com.formdev.flatlaf.FlatLightLaf;
 
 import javax.swing.*;
