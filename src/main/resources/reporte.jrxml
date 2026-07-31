@@ -55,7 +55,7 @@
                 <reportElement x="60" y="0" width="255" height="18"/>
                 <textFieldExpression><![CDATA[$F{nombre}]]></textFieldExpression>
             </textField>
-            <textField pattern="L. #,##0.00">
+            <textField pattern="'L. '#,##0.00">
                 <reportElement x="315" y="0" width="110" height="18"/>
                 <textFieldExpression><![CDATA[$F{precio}]]></textFieldExpression>
             </textField>
